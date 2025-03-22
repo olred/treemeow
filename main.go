@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	// "io"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,17 +21,12 @@ func dirTree(out *os.File, path string, printFiles bool) error {
 func getTree(path string, out *os.File, level int, printFiles bool, levelsInfo *[]int ) error {
 	entries, err := os.ReadDir(path)
 	var indexFiles []int
-	if !printFiles {
-		for i, e := range entries {
-			if e.IsDir() {
-				indexFiles = append(indexFiles, i)
-			}
-		}
-	} else {
-		for i, _ := range entries {
+	for i, e := range entries {
+		if printFiles || e.IsDir() {
 			indexFiles = append(indexFiles, i)
 		}
 	}
+
 	if err != nil {
 		return err
 	}
@@ -43,29 +38,16 @@ func getTree(path string, out *os.File, level int, printFiles bool, levelsInfo *
 		if err != nil {
 			return err
 		}
-		
+		var graph string
 		if i == len(indexFiles)-1 {
-			if entries[e].IsDir() {
-				writer(fileName, levelsInfo, true, "└───", tabs, level)
-				getTree(filePlace, out, level + 1, printFiles, levelsInfo)
-				continue
-			} else if printFiles{
-				fileStat, _ := os.Stat(filePlace)
-				IntSize := fileStat.Size()
-				var fileSize string
-				if IntSize == 0 {
-					fileSize = "empty"
-				} else {
-					fileSize = fmt.Sprintf("%db", IntSize)
-				}
-				writer(fileName, levelsInfo, false, "└───", tabs, level, fileSize)
-				continue
-			}
+			graph = "└───"
+		} else {
+			graph = "├───"
 		}
 		if entries[e].IsDir() {
-			writer(fileName, levelsInfo, true, "├───", tabs, level)
+			writer(fileName, levelsInfo, true, graph, tabs, level, out)
 			getTree(filePlace, out, level + 1, printFiles, levelsInfo)
-		} else if printFiles {
+		} else if printFiles{
 			fileStat, _ := os.Stat(filePlace)
 			IntSize := fileStat.Size()
 			var fileSize string
@@ -74,14 +56,13 @@ func getTree(path string, out *os.File, level int, printFiles bool, levelsInfo *
 			} else {
 				fileSize = fmt.Sprintf("%db", IntSize)
 			}
-			writer(fileName, levelsInfo, false, "├───", tabs, level, fileSize)
-			continue
+			writer(fileName, levelsInfo, false, graph, tabs, level, out, fileSize)
 		}
 	}
 	return nil
 }
 
-func writer(fileName string, levelsInfo *[]int, isDirectory bool, graph string, tabs string, level int, fileSize ...string) {
+func writer(fileName string, levelsInfo *[]int, isDirectory bool, graph string, tabs string, level int, out *os.File, fileSize ...string) {
 	if graph == "├───" {
 		if len(*levelsInfo) - 1 >= level {
 			(*levelsInfo)[level] = 0
@@ -96,20 +77,20 @@ func writer(fileName string, levelsInfo *[]int, isDirectory bool, graph string, 
 		}
 	}
 	var linksString string
-	tempTabul := 4
 	for i := 0; i < level; i++ {
 		if (*levelsInfo)[i] == 0 {
-			linksString += strings.Repeat(" ", tempTabul) + "^-^"
+			linksString += strings.Repeat(" ", 4) + "|"
 		} else {
-			linksString += strings.Repeat(" ", tempTabul)
+			linksString += strings.Repeat(" ", 4)
 		}
 	}
+	var outString string
 	if isDirectory {
-		fmt.Printf(linksString + tabs + "%v\x1b[34;1m%v \x1b[0m\n", graph, fileName)
-
+		outString = fmt.Sprintf(linksString + tabs + "%v\x1b[34;1m%v \x1b[0m\n", graph, fileName)
 	} else {
-		fmt.Printf(linksString + tabs + "%v\x1b[35;1m%v (%v) meow~\x1b[0m\n", graph, fileName, fileSize[0])
+		outString = fmt.Sprintf(linksString + tabs + "%v\x1b[35;1m%v (%v) meow~\x1b[0m\n", graph, fileName, fileSize[0])
 	}
+	io.WriteString(out, outString)
 }
 
 func main() {
